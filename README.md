@@ -1,15 +1,54 @@
-Command-Driven In-Memory Database (Thread-Safe, TTL Enabled)
+# In-Memory Database (Thread-Safe with TTL)
 
-This project implements a command-driven, thread-safe in-memory database written in Java. The system is designed to store key-value data in memory using integer keys and supports generic value types. It accepts user commands through standard input, processes them using a structured command parser, and executes them against the database engine. The implementation focuses on applying object-oriented design principles, multithreading, synchronization, lifecycle control, and exception handling to simulate the behavior of a lightweight database system.
+A high-performance, command-driven in-memory key-value database written in Java. Engineered with custom thread-safety primitives, lazy/proactive Time-To-Live (TTL) expiration algorithms, and a detached command parser architecture.
 
-The database supports commands such as PUT, GET, DELETE, START, STOP, and EXIT. Values can optionally be stored with a time-to-live (TTL), allowing entries to expire automatically after a specified duration. The command parser reads raw input, tokenizes it, validates command syntax, and converts it into structured command objects. This separation between parsing and execution improves maintainability, ensures clean validation, and prevents execution logic from being coupled with input handling.
+## Features
 
-Internally, the database stores data using a map structure that associates integer keys with entry objects. Each entry contains the stored value and an expiration timestamp when TTL is used. Initially, a HashMap combined with synchronized methods is used to ensure atomic operations across multiple threads. This approach guarantees safety but limits scalability due to coarse locking. In later stages, the design is improved using ConcurrentHashMap to increase performance and allow concurrent access with finer-grained locking while maintaining TTL correctness.
+* **Command-Driven CLI Interface:** Parses and executes `PUT`, `GET`, `DELETE`, `START`, `STOP`, and `EXIT` commands.
+* **TTL Entry Auto-Expiration:** Dual-strategy expiration using **Lazy Eviction** (during `GET` lookups) and a **Proactive Background Daemon** (periodic sweeps).
+* **Fine-Grained Concurrency:** Transitioned from coarse `synchronized` methods to `ConcurrentHashMap` for high-throughput multi-threaded operations.
+* **Volatile Lifecycle Controls:** Instant thread-wide visibility for database `START`/`STOP` states using thread safety primitives without locking overhead.
+* **Fail-Fast Error Handling:** Custom exceptions for syntax errors, invalid TTL constraints, missing keys, and illegal operations when stopped.
 
-Expiration handling is implemented using both lazy and proactive strategies. Lazy expiration removes expired entries during GET operations by checking the stored expiry time against the current epoch time. Additionally, a background cleanup thread periodically scans the database and removes expired entries automatically. This hybrid approach balances simplicity and memory efficiency while demonstrating safe concurrent modification techniques.
+## Tech Stack
 
-The lifecycle of the database is controlled using a volatile boolean flag that determines whether the system is running or stopped. This ensures that state changes are immediately visible across threads without heavy synchronization. When the database is stopped, write operations such as PUT and DELETE are rejected, while read operations may return null or raise an exception depending on configuration. This demonstrates proper usage of volatile variables for visibility guarantees in concurrent environments.
+* **Language:** Java 8+
+* **Concurrency Tools:** `ConcurrentHashMap`, `ScheduledExecutorService`, `volatile` flags
+* **Design Patterns:** Command Pattern, Separation of Concerns
 
-Robust exception handling is incorporated through custom exception classes that signal invalid commands, invalid TTL values, stopped database states, and missing keys. This enables fail-fast behavior and produces meaningful feedback for debugging and user interaction. The system is also tested with multiple command executor threads to observe race conditions, validate synchronization strategies, and demonstrate thread-safe execution under concurrent workloads.
+## Command Reference
 
-Overall, this project serves as a practical demonstration of designing a concurrent system from the ground up. It highlights key concepts such as separation of concerns, encapsulation, synchronization tradeoffs, concurrent collections, lifecycle management, and safe background processing. The final implementation showcases how a simple in-memory structure can evolve into a scalable, multithreaded system through incremental refinement and performance optimization.
+| Command | Syntax | Description |
+| --- | --- | --- |
+| **PUT** | `PUT <key> <value> [ttl_ms]` | Inserts or updates an entry (optional TTL in milliseconds). |
+| **GET** | `GET <key>` | Retrieves active entry value; purges key if expired. |
+| **DELETE** | `DELETE <key>` | Explicitly removes a key-value entry. |
+| **START** | `START` | Sets volatile state to active and enables writes. |
+| **STOP** | `STOP` | Suspends write operations and rejects new mutations. |
+| **EXIT** | `EXIT` | Terminates background cleanup threads and stops process. |
+
+## How It Works
+
+1. **Input Parsing:** The command parser tokenizes raw input into structured execution objects before reaching the database engine.
+2. **Concurrent Storage:** Integer keys route to entry objects containing data values alongside epoch millisecond expiration timestamps.
+3. **Hybrid Expiration Sweeps:**
+* **Lazy Check:** Checks current epoch time against key metadata on `GET`.
+* **Proactive Cleanup:** A dedicated thread sweeps the database periodically to reclaim memory from abandoned keys.
+
+
+
+## Getting Started
+
+### 1. Build
+
+```bash
+javac Main.java
+
+```
+
+### 2. Run
+
+```bash
+java Main
+
+```
